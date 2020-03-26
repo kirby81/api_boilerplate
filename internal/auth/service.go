@@ -8,8 +8,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var ErrInvalidToken error = errors.New("invalid token")
-
 type Service struct {
 	tokenSecret string
 	repo        Repository
@@ -18,6 +16,10 @@ type Service struct {
 func NewService(repo Repository, secret string) (*Service, error) {
 	if secret == "" {
 		return nil, errors.New("token secret can't be empty")
+	}
+
+	if repo == nil {
+		return nil, errors.New("no repository provided")
 	}
 
 	return &Service{
@@ -58,7 +60,7 @@ func (s *Service) Signin(email string, password string) error {
 			return fmt.Errorf("failed to get user: %w", err)
 		}
 	} else {
-		return fmt.Errorf("user already exist: %w", err)
+		return errors.New("user already exist")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -72,19 +74,15 @@ func (s *Service) Signin(email string, password string) error {
 }
 
 func (s *Service) Parse(tokenString string) error {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	_, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %w", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 
 		return []byte(s.tokenSecret), nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed to parse token: %w", err)
-	}
-
-	if !token.Valid {
-		return ErrInvalidToken
 	}
 
 	return nil
