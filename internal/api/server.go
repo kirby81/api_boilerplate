@@ -2,47 +2,33 @@ package api
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/gorilla/mux"
-
-	"github.com/kirby81/api-boilerplate/internal/auth"
-	"github.com/kirby81/api-boilerplate/internal/auth/memory"
 	"github.com/rs/zerolog/log"
 )
 
 type Server struct {
 	srv    *http.Server
-	config *config
-	router *mux.Router
-	auth   *auth.Service
+	router http.Handler
 }
 
-func NewServer() (*Server, error) {
-	config, err := newConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to init config: %w", err)
-	}
-
-	auth, err := auth.NewService(memory.NewRepository(), config.TokenSecret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init auth service: %w", err)
+func NewServer(router http.Handler) (*Server, error) {
+	if router == nil {
+		return nil, errors.New("nothing to route")
 	}
 
 	return &Server{
-		config: config,
-		router: mux.NewRouter(),
-		auth:   auth,
+		router: router,
 	}, nil
 }
 
-func (s *Server) Run() error {
-	s.initSrv()
+func (s *Server) Run(host, port string) error {
+	s.initSrv(host, port)
 
 	done := make(chan bool, 1)
 	quit := make(chan os.Signal, 1)
@@ -61,9 +47,8 @@ func (s *Server) Run() error {
 	return nil
 }
 
-func (s *Server) initSrv() {
-	s.routes()
-	addr := fmt.Sprintf("%s:%s", s.config.Hostname, s.config.Port)
+func (s *Server) initSrv(host, port string) {
+	addr := fmt.Sprintf("%s:%s", host, port)
 	s.srv = &http.Server{
 		Addr:         addr,
 		Handler:      s.router,
@@ -86,16 +71,4 @@ func (s *Server) gracefullyShutdown(done chan bool, quit chan os.Signal) {
 		return
 	}
 	close(done)
-}
-
-func (s *Server) respond(w http.ResponseWriter, data interface{}, status int) {
-	w.WriteHeader(status)
-	if data != nil {
-		w.Header().Add("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(data); err != nil {
-			log.Error().Err(err).Msg("Failed to encode response data")
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	}
 }
