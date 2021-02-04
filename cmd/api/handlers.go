@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"html/template"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -11,34 +9,6 @@ import (
 
 	"github.com/kirby81/api-boilerplate/internal/todo"
 )
-
-func (a *api) home() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-
-		files := []string{
-			"./web/html/home.page.tmpl",
-			"./web/html/base.layout.tmpl",
-			"./web/html/footer.partial.tmpl",
-		}
-
-		ts, err := template.ParseFiles(files...)
-		if err != nil {
-			log.Println(err.Error())
-			http.Error(w, "Internal Server Error", 500)
-			return
-		}
-
-		err = ts.Execute(w, nil)
-		if err != nil {
-			log.Println(err.Error())
-			http.Error(w, "Internal Server Error", 500)
-		}
-	}
-}
 
 func (a *api) addTodo() http.HandlerFunc {
 	var req todo.AddTodoRequest
